@@ -3,6 +3,10 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { View, ActivityIndicator } from 'react-native'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import CreateProfileScreen from './screens/CreateProfileScreen'
+import ProfileScreen from './screens/ProfileScreen'
+import EditDetailsScreen from './screens/EditDetailsScreen'
+import ManageCaregiverScreen from './screens/ManageCaregiverScreen'
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen'
 import LoginScreen from './screens/LoginScreen'
 import WelcomeBackScreen from './screens/WelcomeBackScreen'
 import HomeScreen from './screens/HomeScreen'
@@ -34,6 +38,10 @@ function RootNavigator() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="WelcomeBack" component={WelcomeBackScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="EditDetails" component={EditDetailsScreen} />
+      <Stack.Screen name="ManageCaregiver" component={ManageCaregiverScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <Stack.Screen name="AddCaregiver" component={AddCaregiverScreen} />
       <Stack.Screen name="GenerateCode" component={GenerateCodeScreen} />
       <Stack.Screen name="EnterAccessCode" component={EnterAccessCodeScreen} />
