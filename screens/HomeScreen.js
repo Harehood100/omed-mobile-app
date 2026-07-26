@@ -28,7 +28,7 @@ export default function HomeScreen({ navigation }) {
 
                 {/* Menu */}
                 <View style={styles.menu}>
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { }} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('InputMedications')} activeOpacity={0.8}>
                         <View style={styles.iconWrap}><Text style={styles.iconText}>💊</Text></View>
                         <Text style={styles.menuLabel}>Input Medications</Text>
                     </TouchableOpacity>
