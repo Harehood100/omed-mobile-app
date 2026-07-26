@@ -1,68 +1,80 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native'
+import ScreenHeader from '../components/ScreenHeader'
+import CodeInput from '../components/CodeInput'
+import SuccessModal from '../components/SuccessModal'
 
-function formatDate(iso) {
-    return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-}
+export default function EnterAccessCodeScreen({ navigation, route }) {
+    const { name, contact, role, code: expectedCode } = route?.params || {}
 
-function Row({ label, value }) {
-    return (
-        <View style={styles.row}>
-            <Text style={styles.rowLabel}>{label}:</Text>
-            <Text style={styles.rowValue}>{value}</Text>
-        </View>
-    )
-}
+    const [enteredCode, setEnteredCode] = useState('')
+    const [showSuccess, setShowSuccess] = useState(false)
 
-export default function ConfirmAppointmentScreen({ navigation, route }) {
-    const { date, time, notes, reminderDate } = route?.params || {}
-
-    const handleSave = () => {
-        const newAppointment = {
-            id: String(Date.now()),
-            doctorName: notes || 'New Appointment',
-            specialty: 'General Practitioner',
-            dateLabel: `${formatDate(date)} . ${time}`,
-            status: null,
+    const handleConfirm = () => {
+        if (enteredCode.length < 4) {
+            Alert.alert('Incomplete code', 'Please enter the full 4-digit code.')
+            return
         }
-        navigation.navigate('Appointments', { newAppointment })
+        if (enteredCode !== expectedCode) {
+            Alert.alert('Incorrect code', "That code doesn't match. Please check and try again.")
+            return
+        }
+        // No backend endpoint for caregiver connections yet — this confirms locally.
+        // TODO: wire up to a real caregivers endpoint once the backend adds it.
+        setShowSuccess(true)
     }
 
     return (
         <SafeAreaView style={styles.screen}>
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Text style={styles.backArrow}>←</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Confirm Appointment</Text>
-            </View>
+            <View style={styles.circleTopRight} />
+            <View style={styles.circleBottomLeft} />
 
-            <View style={styles.form}>
-                <Row label="Date" value={formatDate(date)} />
-                <Row label="Time" value={time} />
-                <Row label="Notes" value={notes || '—'} />
-                <Row label="Reminder" value={formatDate(reminderDate)} />
-            </View>
+            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+                <ScreenHeader title="Enter Access Code" onBack={() => navigation.goBack()} />
 
-            <View style={styles.bottom}>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                    <Text style={styles.saveBtnText}>Save Appointment</Text>
-                </TouchableOpacity>
-            </View>
+                <View style={styles.form}>
+                    <Text style={styles.instructions}>
+                        Enter the code {name ? `to confirm ${name}` : 'to confirm your caregiver'} as{' '}
+                        {role || 'a caregiver'}
+                        {contact ? ` (${contact})` : ''}
+                    </Text>
+
+                    <View style={styles.codeWrap}>
+                        <CodeInput length={4} value={enteredCode} onChangeValue={setEnteredCode} />
+                    </View>
+                </View>
+
+                <View style={styles.bottom}>
+                    <TouchableOpacity style={styles.confirmBtn} onPress={handleConfirm}>
+                        <Text style={styles.confirmBtnText}>Confirm</Text>
+                    </TouchableOpacity>
+                </View>
+            </ScrollView>
+
+            <SuccessModal
+                visible={showSuccess}
+                title="Caregiver Connected Successfully"
+                onReturnHome={() => {
+                    setShowSuccess(false)
+                    navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
+                }}
+                onClose={() => setShowSuccess(false)}
+            />
         </SafeAreaView>
     )
 }
 
+const PRIMARY = '#3D3F8F'
+
 const styles = StyleSheet.create({
     screen: { flex: 1, backgroundColor: '#FFFFFF' },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 20, gap: 16 },
-    backBtn: { padding: 4 },
-    backArrow: { fontSize: 22, fontWeight: 'bold', color: '#1A1A1A' },
-    title: { fontSize: 20, fontWeight: 'bold', color: '#1A1A1A' },
-    form: { paddingHorizontal: 24, paddingTop: 28, gap: 18 },
-    row: { flexDirection: 'row', gap: 8 },
-    rowLabel: { fontSize: 16, fontWeight: 'bold', color: '#3D3F8F' },
-    rowValue: { fontSize: 16, color: '#3D3F8F' },
-    bottom: { paddingHorizontal: 24, paddingTop: 40 },
-    saveBtn: { width: '100%', height: 56, backgroundColor: '#2D3178', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
-    saveBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },
+    circleTopRight: { position: 'absolute', top: -60, right: -80, width: 220, height: 220, borderRadius: 110, backgroundColor: '#E8EAF0', zIndex: 0 },
+    circleBottomLeft: { position: 'absolute', bottom: -80, left: -80, width: 220, height: 220, borderRadius: 110, backgroundColor: '#E8EAF0', zIndex: 0 },
+    scroll: { flexGrow: 1, justifyContent: 'space-between', zIndex: 1 },
+    form: { paddingHorizontal: 24, paddingTop: 30, alignItems: 'center' },
+    instructions: { fontSize: 16, color: '#1A1A1A', textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+    codeWrap: { alignItems: 'center' },
+    bottom: { paddingHorizontal: 24, paddingBottom: 40 },
+    confirmBtn: { width: '100%', height: 56, borderWidth: 1.5, borderColor: PRIMARY, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+    confirmBtnText: { fontSize: 18, color: PRIMARY, fontWeight: '600' },
 })

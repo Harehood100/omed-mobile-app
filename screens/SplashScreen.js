@@ -5,30 +5,50 @@ import { useAuth } from '../context/AuthContext'
 
 const videoSource = require('../assets/splash-animation.mp4')
 
+// 37 frames at 15fps ≈ 2.47s. Used as a fallback in case the `playToEnd`
+// event doesn't fire reliably (a known expo-video issue on some devices).
+const FALLBACK_DURATION_MS = 2700
+
 export default function SplashScreen({ navigation }) {
     const { user, isLoading } = useAuth()
     const hasNavigated = useRef(false)
+
+    // Refs always hold the latest auth values so the video-end listener
+    // (registered once on mount) never reads a stale closure.
+    const userRef = useRef(user)
+    const isLoadingRef = useRef(isLoading)
+    useEffect(() => {
+        userRef.current = user
+        isLoadingRef.current = isLoading
+    }, [user, isLoading])
 
     const player = useVideoPlayer(videoSource, (p) => {
         p.loop = false
         p.play()
     })
 
-    const goNext = () => {
-        if (hasNavigated.current) return
-        // If the /auth/me session check is still running, wait a bit and try again
-        // rather than flashing the Welcome screen before we know the real state.
-        if (isLoading) {
-            setTimeout(goNext, 150)
-            return
-        }
-        hasNavigated.current = true
-        navigation.replace(user ? 'Home' : 'Welcome')
-    }
-
     useEffect(() => {
+        const goNext = () => {
+            if (hasNavigated.current) return
+            if (isLoadingRef.current) {
+                // Session check still running — try again shortly rather than
+                // guessing where to route.
+                setTimeout(goNext, 150)
+                return
+            }
+            hasNavigated.current = true
+            navigation.replace(userRef.current ? 'Home' : 'Welcome')
+        }
+
         const subscription = player.addListener('playToEnd', goNext)
-        return () => subscription.remove()
+        // Safety net: don't leave the user stuck on the splash forever if the
+        // playToEnd event never fires.
+        const fallback = setTimeout(goNext, FALLBACK_DURATION_MS)
+
+        return () => {
+            subscription.remove()
+            clearTimeout(fallback)
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [player])
 
