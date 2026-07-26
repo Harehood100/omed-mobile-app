@@ -1,6 +1,11 @@
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 
-export default function SuccessModal({ visible, title, message, onDone }) {
+// Two usage modes:
+// 1) Single button:  <SuccessModal visible title="..." onDone={...} />
+// 2) Two buttons:     <SuccessModal visible title="..." onReturnHome={...} onClose={...} />
+export default function SuccessModal({ visible, title, message, onDone, onReturnHome, onClose }) {
+    const showTwoButtons = !!(onReturnHome || onClose)
+
     return (
         <Modal visible={visible} transparent animationType="fade">
             <View style={styles.overlay}>
@@ -10,9 +15,21 @@ export default function SuccessModal({ visible, title, message, onDone }) {
                         <Text style={styles.check}>✓</Text>
                     </View>
                     {message ? <Text style={styles.message}>{message}</Text> : null}
-                    <TouchableOpacity style={styles.doneBtn} onPress={onDone}>
-                        <Text style={styles.doneBtnText}>Done</Text>
-                    </TouchableOpacity>
+
+                    {showTwoButtons ? (
+                        <>
+                            <TouchableOpacity style={styles.doneBtn} onPress={onReturnHome}>
+                                <Text style={styles.doneBtnTextBold}>Return Home</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                                <Text style={styles.closeBtnText}>Close</Text>
+                            </TouchableOpacity>
+                        </>
+                    ) : (
+                        <TouchableOpacity style={styles.doneBtn} onPress={onDone}>
+                            <Text style={styles.doneBtnText}>Done</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </Modal>
@@ -28,4 +45,7 @@ const styles = StyleSheet.create({
     message: { color: '#FFFFFF', fontSize: 15, textAlign: 'center', lineHeight: 22 },
     doneBtn: { backgroundColor: '#FFFFFF', borderRadius: 30, paddingVertical: 12, paddingHorizontal: 40, width: '100%', alignItems: 'center' },
     doneBtnText: { color: '#1A1A1A', fontSize: 16, fontWeight: '600' },
+    doneBtnTextBold: { color: '#1A1A1A', fontSize: 16, fontWeight: 'bold' },
+    closeBtn: { backgroundColor: '#FFFFFF', borderRadius: 30, paddingVertical: 12, paddingHorizontal: 40, width: '100%', alignItems: 'center' },
+    closeBtnText: { color: '#1A1A1A', fontSize: 16, fontWeight: 'bold' },
 })
