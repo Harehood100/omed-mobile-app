@@ -51,7 +51,7 @@ export default function HomeScreen({ navigation }) {
                         </View>
                     </View>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { }} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate('Profile')} activeOpacity={0.8}>
                         <View style={styles.iconWrap}><Text style={styles.iconText}>👤</Text></View>
                         <Text style={styles.menuLabel}>My Profile</Text>
                     </TouchableOpacity>

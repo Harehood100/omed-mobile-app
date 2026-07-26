@@ -15,6 +15,10 @@ import SetReminderScreen from './screens/SetReminderScreen'
 import ConfirmAppointmentScreen from './screens/ConfirmAppointmentScreen'
 import InputMedicationsScreen from './screens/InputMedicationsScreen'
 import MedicationReminderScreen from './screens/MedicationReminderScreen'
+import ProfileScreen from './screens/ProfileScreen'
+import EditDetailsScreen from './screens/EditDetailsScreen'
+import ManageCaregiverScreen from './screens/ManageCaregiverScreen'
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen'
 
 const Stack = createNativeStackNavigator()
 
@@ -38,6 +42,10 @@ function RootNavigator() {
       <Stack.Screen name="ConfirmAppointment" component={ConfirmAppointmentScreen} />
       <Stack.Screen name="InputMedications" component={InputMedicationsScreen} />
       <Stack.Screen name="MedicationReminder" component={MedicationReminderScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="EditDetails" component={EditDetailsScreen} />
+      <Stack.Screen name="ManageCaregiver" component={ManageCaregiverScreen} />
+      <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
     </Stack.Navigator>
   )
 }
