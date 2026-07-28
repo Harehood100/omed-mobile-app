@@ -1,11 +1,15 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Modal } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Modal, Alert } from 'react-native'
 import SuccessModal from '../components/SuccessModal'
+import { scheduleLocalNotification } from '../lib/localNotifications'
+import { parseTimeString } from '../lib/medicationTime'
 
 const OFFSET_OPTIONS = [5, 10, 15, 30, 60]
 
 export default function MedicationReminderScreen({ navigation, route }) {
     const medication = route?.params?.medication || ''
+    const medicationName = route?.params?.medicationName || medication
+    const medicationTime = route?.params?.medicationTime || ''
 
     const [minutesBefore, setMinutesBefore] = useState(null)
     const [showPicker, setShowPicker] = useState(false)
@@ -13,9 +17,47 @@ export default function MedicationReminderScreen({ navigation, route }) {
 
     const offsetLabel = minutesBefore ? `${minutesBefore} minutes before exact time` : 'X minutes before exact time'
 
-    const handleSave = () => {
-        // No backend endpoint for reminders yet — this confirms locally.
-        // TODO: wire up to a real reminders endpoint once the backend adds it.
+    // Reminders are scheduled on-device for this MVP (no backend reminder endpoint yet,
+    // per the integration contract's "Reminder Integration" section).
+    const handleSave = async () => {
+        if (!minutesBefore) {
+            Alert.alert('Pick a time', 'Please choose how many minutes before to be reminded.')
+            return
+        }
+
+        const parsedTime = parseTimeString(medicationTime)
+        if (!parsedTime) {
+            Alert.alert(
+                'Could not schedule',
+                `Couldn't understand the time "${medicationTime}". Please make sure the medication row includes a time like "3pm" or "15:00".`
+            )
+            return
+        }
+
+        // Find the next occurrence of that time (today if still upcoming, else tomorrow),
+        // then subtract the offset.
+        const now = new Date()
+        const target = new Date(now)
+        target.setHours(parsedTime.hours, parsedTime.minutes, 0, 0)
+        if (target.getTime() <= now.getTime()) {
+            target.setDate(target.getDate() + 1)
+        }
+        const triggerDate = new Date(target.getTime() - minutesBefore * 60 * 1000)
+
+        const result = await scheduleLocalNotification({
+            title: 'Medication Reminder',
+            body: `Time to take ${medicationName || 'your medication'} soon.`,
+            date: triggerDate,
+        })
+
+        if (!result) {
+            Alert.alert(
+                'Notifications not enabled',
+                'Please allow notifications for this app in your device settings to receive medication reminders.'
+            )
+            return
+        }
+
         setShowSuccess(true)
     }
 

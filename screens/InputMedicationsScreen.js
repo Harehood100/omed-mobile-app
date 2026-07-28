@@ -1,13 +1,24 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import SuccessModal from '../components/SuccessModal'
+import { createMedication } from '../api/medications'
+import { parseTimeString, toHHMM } from '../lib/medicationTime'
 
 let nextId = 1
 const makeRow = () => ({ id: nextId++, text: '' })
 
+const todayISO = () => new Date().toISOString().slice(0, 10)
+
+// "Medication Name, Dosage, Time" -> { name, dosage, time }
+function parseRow(text) {
+    const parts = text.split(',').map((p) => p.trim()).filter(Boolean)
+    return { name: parts[0] || '', dosage: parts[1] || '', time: parts[2] || '' }
+}
+
 export default function InputMedicationsScreen({ navigation }) {
     const [rows, setRows] = useState(() => Array.from({ length: 6 }, makeRow))
     const [showSuccess, setShowSuccess] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
 
     const updateRow = (id, text) => {
         setRows((prev) => prev.map((r) => (r.id === id ? { ...r, text } : r)))
@@ -19,15 +30,60 @@ export default function InputMedicationsScreen({ navigation }) {
 
     const handleSetReminder = (row) => {
         if (!row.text.trim()) return
-        navigation.navigate('MedicationReminder', { medication: row.text })
+        const { name, dosage, time } = parseRow(row.text)
+        navigation.navigate('MedicationReminder', {
+            medication: row.text,
+            medicationName: name,
+            medicationTime: time,
+        })
     }
 
-    const handleSave = () => {
-        // No backend endpoint for medications yet — this just confirms locally.
-        // TODO: wire up to a real POST /medications (or similar) once the backend adds it.
+    const handleSave = async () => {
         const filled = rows.filter((r) => r.text.trim())
         if (filled.length === 0) return
-        setShowSuccess(true)
+
+        setIsSaving(true)
+
+        const results = await Promise.allSettled(
+            filled.map((row) => {
+                const { name, dosage, time } = parseRow(row.text)
+                const parsedTime = parseTimeString(time)
+
+                return createMedication({
+                    name,
+                    dosage,
+                    // Not collected by this form yet — using a sensible default.
+                    // TODO: add a real frequency picker to this screen if per-medication frequency matters.
+                    frequency: 'Once Daily',
+                    reminderTime: parsedTime ? [toHHMM(parsedTime)] : [],
+                    startDate: todayISO(),
+                    instructions: '',
+                })
+            })
+        )
+
+        setIsSaving(false)
+
+        const failures = results
+            .map((r, i) => ({ r, row: filled[i] }))
+            .filter(({ r }) => r.status === 'rejected')
+
+        if (failures.length > 0) {
+            const messages = failures.map(({ r, row }) => {
+                const err = r.reason
+                const detail = err?.errors ? Object.values(err.errors).flat().join(' ') : err?.message
+                return `"${row.text}": ${detail || 'Failed to save.'}`
+            })
+            Alert.alert(
+                failures.length === filled.length ? 'Save failed' : 'Some medications failed to save',
+                messages.join('\n')
+            )
+        }
+
+        const succeededCount = results.length - failures.length
+        if (succeededCount > 0) {
+            setShowSuccess(true)
+        }
     }
 
     return (
@@ -72,8 +128,8 @@ export default function InputMedicationsScreen({ navigation }) {
                 </View>
 
                 <View style={styles.bottom}>
-                    <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                        <Text style={styles.saveBtnText}>Save</Text>
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+                        {isSaving ? <ActivityIndicator color="#3D3F8F" /> : <Text style={styles.saveBtnText}>Save</Text>}
                     </TouchableOpacity>
                 </View>
             </ScrollView>
