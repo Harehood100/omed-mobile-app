@@ -4,6 +4,27 @@ import { createAppointment } from '../api/appointments'
 import { scheduleLocalNotification } from '../lib/localNotifications'
 import { toHHMM } from '../lib/medicationTime'
 
+// Backend "errors" fields have shown up in more than one shape (arrays of
+// strings, nested objects, plain strings) — this walks whatever comes back
+// and always produces readable text instead of "[object Object]".
+function extractErrorMessage(err) {
+    const parts = []
+
+    const collect = (value) => {
+        if (value == null) return
+        if (typeof value === 'string') { parts.push(value); return }
+        if (Array.isArray(value)) { value.forEach(collect); return }
+        if (typeof value === 'object') { Object.values(value).forEach(collect); return }
+        parts.push(String(value))
+    }
+
+    if (err?.errors) collect(err.errors)
+    if (parts.length === 0 && err?.message) parts.push(err.message)
+    if (parts.length === 0) parts.push('Please try again.')
+
+    return parts.join(' ')
+}
+
 function formatDateLabel(iso) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
@@ -59,8 +80,9 @@ export default function ConfirmAppointmentScreen({ navigation, route }) {
             // rather than trusting local state.
             navigation.navigate('Appointments', { appointmentCreated: true })
         } catch (err) {
-            const detail = err?.errors ? Object.values(err.errors).flat().join(' ') : err?.message
-            Alert.alert('Could not save appointment', detail || 'Please try again.')
+            console.log('createAppointment failed:', JSON.stringify(err))
+            const detail = extractErrorMessage(err)
+            Alert.alert('Could not save appointment', detail)
         } finally {
             setIsSaving(false)
         }
