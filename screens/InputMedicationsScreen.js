@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import SuccessModal from '../components/SuccessModal'
 import { createMedication } from '../api/medications'
 import { parseTimeString, toHHMM } from '../lib/medicationTime'
 import { extractErrorMessage } from '../lib/errorMessage'
 
 let nextId = 1
-const makeRow = () => ({ id: nextId++, text: '' })
+const makeRow = () => ({ id: nextId++, text: '', savedId: null, savingReminder: false })
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
@@ -14,6 +15,20 @@ const todayISO = () => new Date().toISOString().slice(0, 10)
 function parseRow(text) {
     const parts = text.split(',').map((p) => p.trim()).filter(Boolean)
     return { name: parts[0] || '', dosage: parts[1] || '', time: parts[2] || '' }
+}
+
+function buildMedicationPayload({ name, dosage, time }) {
+    const parsedTime = parseTimeString(time)
+    return {
+        name,
+        dosage,
+        // Not collected by this form yet — using a sensible default.
+        // TODO: add a real frequency picker to this screen if per-medication frequency matters.
+        frequency: 'Once Daily',
+        reminderTime: parsedTime ? [toHHMM(parsedTime)] : [],
+        startDate: todayISO(),
+        instructions: '',
+    }
 }
 
 export default function InputMedicationsScreen({ navigation }) {
@@ -29,44 +44,62 @@ export default function InputMedicationsScreen({ navigation }) {
         setRows((prev) => [...prev, makeRow()])
     }
 
-    const handleSetReminder = (row) => {
+    // A reminder needs a real medication _id to reference on the backend, so if this row
+    // hasn't been saved yet, save it now before navigating to the reminder screen.
+    const handleSetReminder = async (row) => {
         if (!row.text.trim()) return
         const { name, dosage, time } = parseRow(row.text)
-        navigation.navigate('MedicationReminder', {
-            medication: row.text,
-            medicationName: name,
-            medicationTime: time,
-        })
+
+        if (row.savedId) {
+            navigation.navigate('MedicationReminder', {
+                medicationId: row.savedId,
+                medication: row.text,
+                medicationName: name,
+                medicationTime: time,
+            })
+            return
+        }
+
+        setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, savingReminder: true } : r)))
+        try {
+            const created = await createMedication(buildMedicationPayload({ name, dosage, time }))
+            const medicationId = created?.id || created?._id
+            setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, savingReminder: false, savedId: medicationId } : r)))
+            navigation.navigate('MedicationReminder', {
+                medicationId,
+                medication: row.text,
+                medicationName: name,
+                medicationTime: time,
+            })
+        } catch (err) {
+            setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, savingReminder: false } : r)))
+            console.log('createMedication (for reminder) failed:', JSON.stringify(err))
+            Alert.alert('Could not save medication', extractErrorMessage(err))
+        }
     }
 
     const handleSave = async () => {
         const filled = rows.filter((r) => r.text.trim())
         if (filled.length === 0) return
 
+        // Rows already saved via the "set reminder" button shouldn't be created again.
+        const toCreate = filled.filter((r) => !r.savedId)
+
+        if (toCreate.length === 0) {
+            setShowSuccess(true)
+            return
+        }
+
         setIsSaving(true)
 
         const results = await Promise.allSettled(
-            filled.map((row) => {
-                const { name, dosage, time } = parseRow(row.text)
-                const parsedTime = parseTimeString(time)
-
-                return createMedication({
-                    name,
-                    dosage,
-                    // Not collected by this form yet — using a sensible default.
-                    // TODO: add a real frequency picker to this screen if per-medication frequency matters.
-                    frequency: 'Once Daily',
-                    reminderTime: parsedTime ? [toHHMM(parsedTime)] : [],
-                    startDate: todayISO(),
-                    instructions: '',
-                })
-            })
+            toCreate.map((row) => buildMedicationPayload(parseRow(row.text))).map(createMedication)
         )
 
         setIsSaving(false)
 
         const failures = results
-            .map((r, i) => ({ r, row: filled[i] }))
+            .map((r, i) => ({ r, row: toCreate[i] }))
             .filter(({ r }) => r.status === 'rejected')
 
         if (failures.length > 0) {
@@ -76,12 +109,12 @@ export default function InputMedicationsScreen({ navigation }) {
                 return `"${row.text}": ${extractErrorMessage(err)}`
             })
             Alert.alert(
-                failures.length === filled.length ? 'Save failed' : 'Some medications failed to save',
+                failures.length === toCreate.length ? 'Save failed' : 'Some medications failed to save',
                 messages.join('\n')
             )
         }
 
-        const succeededCount = results.length - failures.length
+        const succeededCount = (filled.length - toCreate.length) + (results.length - failures.length)
         if (succeededCount > 0) {
             setShowSuccess(true)
         }
@@ -120,9 +153,15 @@ export default function InputMedicationsScreen({ navigation }) {
                                 onChangeText={(text) => updateRow(row.id, text)}
                             />
 
-                            <TouchableOpacity onPress={() => handleSetReminder(row)} style={styles.reminderBtn}>
-                                <Text style={styles.reminderIcon}>⏰</Text>
-                                <Text style={styles.reminderPlus}>+</Text>
+                            <TouchableOpacity onPress={() => handleSetReminder(row)} style={styles.reminderBtn} disabled={row.savingReminder}>
+                                {row.savingReminder ? (
+                                    <ActivityIndicator size="small" color={PRIMARY} />
+                                ) : (
+                                    <>
+                                        <Text style={styles.reminderIcon}>⏰</Text>
+                                        <Text style={styles.reminderPlus}>+</Text>
+                                    </>
+                                )}
                             </TouchableOpacity>
                         </View>
                     ))}

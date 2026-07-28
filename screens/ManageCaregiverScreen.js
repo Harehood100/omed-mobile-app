@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, View } from 'react-native'
+import { Text, TouchableOpacity, StyleSheet, ScrollView, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import ScreenHeader from '../components/ScreenHeader'
 import NameRow from '../components/NameRow'
 import SuccessModal from '../components/SuccessModal'

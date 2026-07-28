@@ -1,4 +1,5 @@
-import { View, Alert, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
+import { View, Alert, StyleSheet, ScrollView } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import ScreenHeader from '../components/ScreenHeader'
 import MenuRow from '../components/MenuRow'
 import { useAuth } from '../context/AuthContext'

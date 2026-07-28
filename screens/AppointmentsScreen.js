@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Platform, ActivityIndicator, RefreshControl } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator, RefreshControl } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 // npm install @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker'
 import { getAppointments } from '../api/appointments'

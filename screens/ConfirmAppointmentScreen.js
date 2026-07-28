@@ -1,6 +1,8 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { createAppointment } from '../api/appointments'
+import { createReminder } from '../api/reminders'
 import { scheduleLocalNotification } from '../lib/localNotifications'
 import { toHHMM } from '../lib/medicationTime'
 import { extractErrorMessage } from '../lib/errorMessage'
@@ -36,7 +38,7 @@ export default function ConfirmAppointmentScreen({ navigation, route }) {
     const handleSave = async () => {
         setIsSaving(true)
         try {
-            await createAppointment({
+            const appointment = await createAppointment({
                 hospitalName,
                 doctorSpeciality,
                 doctorName,
@@ -45,15 +47,31 @@ export default function ConfirmAppointmentScreen({ navigation, route }) {
                 note: notes,
             })
 
-            // Reminders are scheduled on-device for this MVP (no backend reminder
-            // endpoint yet, per the integration contract's "Reminder Integration" section).
             if (minutesBefore) {
                 const triggerDate = new Date(new Date(date).getTime() - minutesBefore * 60 * 1000)
-                await scheduleLocalNotification({
-                    title: 'Appointment Reminder',
-                    body: `${doctorName || 'Your doctor'} appointment${hospitalName ? ` at ${hospitalName}` : ''} soon.`,
-                    date: triggerDate,
-                })
+                const appointmentId = appointment?.id || appointment?._id
+                try {
+                    const reminder = await createReminder({
+                        type: 'Appointment',
+                        referenceId: appointmentId,
+                        title: 'Appointment Reminder',
+                        message: `${doctorName || 'Your doctor'} appointment${hospitalName ? ` at ${hospitalName}` : ''} soon.`,
+                        scheduledAt: triggerDate.toISOString(),
+                        repeat: 'NONE',
+                        enabled: true,
+                    })
+                    const reminderId = reminder?.id || reminder?._id
+                    await scheduleLocalNotification({
+                        title: 'Appointment Reminder',
+                        body: `${doctorName || 'Your doctor'} appointment${hospitalName ? ` at ${hospitalName}` : ''} soon.`,
+                        date: triggerDate,
+                        data: { reminderId },
+                    })
+                } catch (reminderErr) {
+                    // The appointment itself saved fine — don't block the user over a
+                    // reminder failure, just leave them without a notification for this one.
+                    console.log('appointment reminder setup failed:', JSON.stringify(reminderErr))
+                }
             }
 
             // AppointmentsScreen watches for this param and refetches from the server

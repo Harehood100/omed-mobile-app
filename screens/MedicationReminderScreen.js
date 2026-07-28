@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Modal, Alert } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Modal, Alert, ActivityIndicator } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import SuccessModal from '../components/SuccessModal'
 import { scheduleLocalNotification } from '../lib/localNotifications'
 import { parseTimeString } from '../lib/medicationTime'
+import { createReminder, deleteReminder } from '../api/reminders'
+import { extractErrorMessage } from '../lib/errorMessage'
 
 const OFFSET_OPTIONS = [5, 10, 15, 30, 60]
 
 export default function MedicationReminderScreen({ navigation, route }) {
+    const medicationId = route?.params?.medicationId || null
     const medication = route?.params?.medication || ''
     const medicationName = route?.params?.medicationName || medication
     const medicationTime = route?.params?.medicationTime || ''
@@ -14,11 +18,13 @@ export default function MedicationReminderScreen({ navigation, route }) {
     const [minutesBefore, setMinutesBefore] = useState(null)
     const [showPicker, setShowPicker] = useState(false)
     const [showSuccess, setShowSuccess] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
 
     const offsetLabel = minutesBefore ? `${minutesBefore} minutes before exact time` : 'X minutes before exact time'
 
-    // Reminders are scheduled on-device for this MVP (no backend reminder endpoint yet,
-    // per the integration contract's "Reminder Integration" section).
+    // Creates the reminder record on the backend first (so the notification can carry its
+    // id and report back when it fires), then schedules the local notification that
+    // actually displays on-device.
     const handleSave = async () => {
         if (!minutesBefore) {
             Alert.alert('Pick a time', 'Please choose how many minutes before to be reminded.')
@@ -34,6 +40,11 @@ export default function MedicationReminderScreen({ navigation, route }) {
             return
         }
 
+        if (!medicationId) {
+            Alert.alert('Could not schedule', 'This medication was not saved yet — please go back and try again.')
+            return
+        }
+
         // Find the next occurrence of that time (today if still upcoming, else tomorrow),
         // then subtract the offset.
         const now = new Date()
@@ -44,13 +55,40 @@ export default function MedicationReminderScreen({ navigation, route }) {
         }
         const triggerDate = new Date(target.getTime() - minutesBefore * 60 * 1000)
 
+        setIsSaving(true)
+
+        let reminder
+        try {
+            reminder = await createReminder({
+                type: 'Medication',
+                referenceId: medicationId,
+                title: 'Medication Reminder',
+                message: `Time to take ${medicationName || 'your medication'} soon.`,
+                scheduledAt: triggerDate.toISOString(),
+                repeat: 'DAILY',
+                enabled: true,
+            })
+        } catch (err) {
+            setIsSaving(false)
+            console.log('createReminder failed:', JSON.stringify(err))
+            Alert.alert('Could not save reminder', extractErrorMessage(err))
+            return
+        }
+
+        const reminderId = reminder?.id || reminder?._id
         const result = await scheduleLocalNotification({
             title: 'Medication Reminder',
             body: `Time to take ${medicationName || 'your medication'} soon.`,
             date: triggerDate,
+            data: { reminderId },
         })
 
+        setIsSaving(false)
+
         if (!result) {
+            // Local scheduling failed (e.g. permissions denied) — don't leave an orphaned
+            // reminder on the backend with nothing to ever trigger it.
+            if (reminderId) deleteReminder(reminderId).catch(() => {})
             Alert.alert(
                 'Notifications not enabled',
                 'Please allow notifications for this app in your device settings to receive medication reminders.'
@@ -96,8 +134,8 @@ export default function MedicationReminderScreen({ navigation, route }) {
                 </View>
 
                 <View style={styles.bottom}>
-                    <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                        <Text style={styles.saveBtnText}>Save</Text>
+                    <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+                        {isSaving ? <ActivityIndicator color={PRIMARY} /> : <Text style={styles.saveBtnText}>Save</Text>}
                     </TouchableOpacity>
                 </View>
             </ScrollView>

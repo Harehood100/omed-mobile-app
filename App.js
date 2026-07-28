@@ -1,7 +1,11 @@
+import { useEffect } from 'react'
+import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { AuthProvider } from './context/AuthContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { registerReminderTriggerListener } from './lib/localNotifications'
+import { triggerReminder } from './api/reminders'
 import SplashScreen from './screens/SplashScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import CreateProfileScreen from './screens/CreateProfileScreen'
@@ -60,14 +64,27 @@ function RootNavigator() {
 }
 
 export default function App() {
+  // Whenever a scheduled local notification actually displays, tell the backend so it
+  // can flip the reminder from PENDING to TRIGGERED (see lib/localNotifications.js).
+  useEffect(() => {
+    const subscription = registerReminderTriggerListener((reminderId) => {
+      triggerReminder(reminderId).catch((err) => {
+        console.log('triggerReminder failed:', JSON.stringify(err))
+      })
+    })
+    return () => subscription.remove()
+  }, [])
+
   return (
-    <ErrorBoundary>
-      <AuthProvider>
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </ErrorBoundary>
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <NavigationContainer>
+            <RootNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   )
 }
 
