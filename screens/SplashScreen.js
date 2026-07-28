@@ -10,17 +10,19 @@ const videoSource = require('../assets/splash-animation.mp4')
 const FALLBACK_DURATION_MS = 2700
 
 export default function SplashScreen({ navigation }) {
-    const { user, isLoading } = useAuth()
+    const { user, isLoading, lastKnownUser } = useAuth()
     const hasNavigated = useRef(false)
 
     // Refs always hold the latest auth values so the video-end listener
     // (registered once on mount) never reads a stale closure.
     const userRef = useRef(user)
     const isLoadingRef = useRef(isLoading)
+    const lastKnownUserRef = useRef(lastKnownUser)
     useEffect(() => {
         userRef.current = user
         isLoadingRef.current = isLoading
-    }, [user, isLoading])
+        lastKnownUserRef.current = lastKnownUser
+    }, [user, isLoading, lastKnownUser])
 
     const player = useVideoPlayer(videoSource, (p) => {
         p.loop = false
@@ -37,7 +39,13 @@ export default function SplashScreen({ navigation }) {
                 return
             }
             hasNavigated.current = true
-            navigation.replace(userRef.current ? 'Home' : 'Welcome')
+            if (userRef.current) {
+                navigation.replace('Home')
+            } else if (lastKnownUserRef.current) {
+                navigation.replace('WelcomeBack')
+            } else {
+                navigation.replace('Welcome')
+            }
         }
 
         const subscription = player.addListener('playToEnd', goNext)

@@ -4,7 +4,7 @@ import MenuRow from '../components/MenuRow'
 import { useAuth } from '../context/AuthContext'
 
 export default function ProfileScreen({ navigation }) {
-    const { logout } = useAuth()
+    const { logout, lastKnownUser } = useAuth()
 
     const handleLogout = () => {
         Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -14,7 +14,7 @@ export default function ProfileScreen({ navigation }) {
                 style: 'destructive',
                 onPress: async () => {
                     await logout()
-                    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })
+                    navigation.reset({ index: 0, routes: [{ name: lastKnownUser ? 'WelcomeBack' : 'Welcome' }] })
                 },
             },
         ])
