@@ -1,30 +1,69 @@
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native'
+import { useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert } from 'react-native'
+import { createAppointment } from '../api/appointments'
+import { scheduleLocalNotification } from '../lib/localNotifications'
+import { toHHMM } from '../lib/medicationTime'
 
-function formatDate(iso) {
+function formatDateLabel(iso) {
     return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+}
+
+// Backend expects "YYYY-MM-DD".
+function toDateOnly(iso) {
+    return new Date(iso).toISOString().slice(0, 10)
+}
+
+// Backend expects 24-hour "HH:mm" — the display label ("9:30 AM") is for humans only.
+function toApiTime(iso) {
+    const d = new Date(iso)
+    return toHHMM({ hours: d.getHours(), minutes: d.getMinutes() })
 }
 
 function Row({ label, value }) {
     return (
         <View style={styles.row}>
             <Text style={styles.rowLabel}>{label}:</Text>
-            <Text style={styles.rowValue}>{value}</Text>
+            <Text style={styles.rowValue}>{value || '—'}</Text>
         </View>
     )
 }
 
 export default function ConfirmAppointmentScreen({ navigation, route }) {
-    const { date, time, notes, reminderDate } = route?.params || {}
+    const { date, time, hospitalName, doctorName, doctorSpeciality, notes, minutesBefore } = route?.params || {}
+    const [isSaving, setIsSaving] = useState(false)
 
-    const handleSave = () => {
-        const newAppointment = {
-            id: String(Date.now()),
-            doctorName: notes || 'New Appointment',
-            specialty: 'General Practitioner',
-            dateLabel: `${formatDate(date)} . ${time}`,
-            status: null,
+    const handleSave = async () => {
+        setIsSaving(true)
+        try {
+            await createAppointment({
+                hospitalName,
+                doctorSpeciality,
+                doctorName,
+                appointmentDate: toDateOnly(date),
+                appointmentTime: toApiTime(date),
+                note: notes,
+            })
+
+            // Reminders are scheduled on-device for this MVP (no backend reminder
+            // endpoint yet, per the integration contract's "Reminder Integration" section).
+            if (minutesBefore) {
+                const triggerDate = new Date(new Date(date).getTime() - minutesBefore * 60 * 1000)
+                await scheduleLocalNotification({
+                    title: 'Appointment Reminder',
+                    body: `${doctorName || 'Your doctor'} appointment${hospitalName ? ` at ${hospitalName}` : ''} soon.`,
+                    date: triggerDate,
+                })
+            }
+
+            // AppointmentsScreen watches for this param and refetches from the server
+            // rather than trusting local state.
+            navigation.navigate('Appointments', { appointmentCreated: true })
+        } catch (err) {
+            const detail = err?.errors ? Object.values(err.errors).flat().join(' ') : err?.message
+            Alert.alert('Could not save appointment', detail || 'Please try again.')
+        } finally {
+            setIsSaving(false)
         }
-        navigation.navigate('Appointments', { newAppointment })
     }
 
     return (
@@ -37,15 +76,18 @@ export default function ConfirmAppointmentScreen({ navigation, route }) {
             </View>
 
             <View style={styles.form}>
-                <Row label="Date" value={formatDate(date)} />
+                <Row label="Hospital" value={hospitalName} />
+                <Row label="Doctor" value={doctorName} />
+                <Row label="Speciality" value={doctorSpeciality} />
+                <Row label="Date" value={formatDateLabel(date)} />
                 <Row label="Time" value={time} />
-                <Row label="Notes" value={notes || '—'} />
-                <Row label="Reminder" value={formatDate(reminderDate)} />
+                <Row label="Notes" value={notes} />
+                <Row label="Reminder" value={minutesBefore ? `${minutesBefore} minutes before` : 'None'} />
             </View>
 
             <View style={styles.bottom}>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSave}>
-                    <Text style={styles.saveBtnText}>Save Appointment</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={isSaving}>
+                    {isSaving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.saveBtnText}>Save Appointment</Text>}
                 </TouchableOpacity>
             </View>
         </SafeAreaView>
@@ -61,7 +103,7 @@ const styles = StyleSheet.create({
     form: { paddingHorizontal: 24, paddingTop: 28, gap: 18 },
     row: { flexDirection: 'row', gap: 8 },
     rowLabel: { fontSize: 16, fontWeight: 'bold', color: '#3D3F8F' },
-    rowValue: { fontSize: 16, color: '#3D3F8F' },
+    rowValue: { fontSize: 16, color: '#3D3F8F', flexShrink: 1 },
     bottom: { paddingHorizontal: 24, paddingTop: 40 },
     saveBtn: { width: '100%', height: 56, backgroundColor: '#2D3178', borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
     saveBtnText: { color: '#FFFFFF', fontSize: 18, fontWeight: '600' },

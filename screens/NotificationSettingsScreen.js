@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
 import ScreenHeader from '../components/ScreenHeader'
 import Checkbox from '../components/Checkbox'
-import SuccessModal from '../components/SucessModal'
+import SuccessModal from '../components/SuccessModal'
 
 export default function NotificationSettingsScreen({ navigation }) {
     const [displayAvatar, setDisplayAvatar] = useState(true)
@@ -23,18 +23,17 @@ export default function NotificationSettingsScreen({ navigation }) {
                 <ScreenHeader title="Notification Settings" onBack={() => navigation.goBack()} />
 
                 <View style={styles.form}>
-                    {/* Sub-settings screens aren't built yet — hook these up once they exist. */}
-                    <TouchableOpacity style={styles.pillField} activeOpacity={0.7} onPress={() => { }}>
+                    <TouchableOpacity style={styles.pillField} activeOpacity={0.7} onPress={() => navigation.navigate('SoundSettings')}>
                         <Text style={styles.pillText}>Sound Settings</Text>
                     </TouchableOpacity>
                     <View style={styles.gap} />
 
-                    <TouchableOpacity style={styles.pillFieldTall} activeOpacity={0.7} onPress={() => { }}>
+                    <TouchableOpacity style={styles.pillFieldTall} activeOpacity={0.7} onPress={() => navigation.navigate('VibrationSettings')}>
                         <Text style={styles.pillText}>Vibration{'\n'}Settings</Text>
                     </TouchableOpacity>
                     <View style={styles.gap} />
 
-                    <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => { }}>
+                    <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => navigation.navigate('AvatarPreference')}>
                         <View style={styles.iconWrap}><Text style={styles.iconText}>🐶</Text></View>
                         <Text style={styles.menuLabel}>Avatar Preference</Text>
                     </TouchableOpacity>
@@ -46,7 +45,7 @@ export default function NotificationSettingsScreen({ navigation }) {
                     </View>
                     <View style={styles.gap} />
 
-                    <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => { }}>
+                    <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => navigation.navigate('AvatarPreference')}>
                         <View style={styles.iconWrap}><Text style={styles.iconText}>🐶</Text></View>
                         <Text style={styles.menuLabel}>Change Avatar</Text>
                     </TouchableOpacity>

@@ -1,8 +1,25 @@
-import { View, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
+import { View, Alert, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
 import ScreenHeader from '../components/ScreenHeader'
 import MenuRow from '../components/MenuRow'
+import { useAuth } from '../context/AuthContext'
 
 export default function ProfileScreen({ navigation }) {
+    const { logout } = useAuth()
+
+    const handleLogout = () => {
+        Alert.alert('Log Out', 'Are you sure you want to log out?', [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: 'Log Out',
+                style: 'destructive',
+                onPress: async () => {
+                    await logout()
+                    navigation.reset({ index: 0, routes: [{ name: 'Welcome' }] })
+                },
+            },
+        ])
+    }
+
     return (
         <SafeAreaView style={styles.screen}>
             <View style={styles.circleBottom} />
@@ -14,8 +31,8 @@ export default function ProfileScreen({ navigation }) {
                     <MenuRow icon="👤" label="Edit Details" onPress={() => navigation.navigate('EditDetails')} />
                     <MenuRow icon="👨‍👩‍👧" label="Manage Caregiver / Child" onPress={() => navigation.navigate('ManageCaregiver')} />
                     <MenuRow icon="🔔" label="Notification Settings" onPress={() => navigation.navigate('NotificationSettings')} />
-                    {/* Avatar Preference screen isn't built yet — wire this up once that screen exists. */}
-                    <MenuRow icon="🐶" label="Avatar Preference" onPress={() => { }} />
+                    <MenuRow icon="🐶" label="Avatar Preference" onPress={() => navigation.navigate('AvatarPreference')} />
+                    <MenuRow icon="🚪" label="Log Out" onPress={handleLogout} />
                 </View>
             </ScrollView>
         </SafeAreaView>

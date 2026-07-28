@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, View } from 'react-native'
 import ScreenHeader from '../components/ScreenHeader'
 import NameRow from '../components/NameRow'
-import SuccessModal from '../components/SucessModal'
+import SuccessModal from '../components/SuccessModal'
 
 let nextId = 1
 const makeId = () => String(nextId++)

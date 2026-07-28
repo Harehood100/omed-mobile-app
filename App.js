@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { AuthProvider } from './context/AuthContext'
+import ErrorBoundary from './components/ErrorBoundary'
 import SplashScreen from './screens/SplashScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
 import CreateProfileScreen from './screens/CreateProfileScreen'
@@ -19,6 +20,9 @@ import ProfileScreen from './screens/ProfileScreen'
 import EditDetailsScreen from './screens/EditDetailsScreen'
 import ManageCaregiverScreen from './screens/ManageCaregiverScreen'
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen'
+import SoundSettingsScreen from './screens/SoundSettingsScreen'
+import VibrationSettingsScreen from './screens/VibrationSettingsScreen'
+import AvatarPreferenceScreen from './screens/AvatarPreferenceScreen'
 
 const Stack = createNativeStackNavigator()
 
@@ -46,17 +50,22 @@ function RootNavigator() {
       <Stack.Screen name="EditDetails" component={EditDetailsScreen} />
       <Stack.Screen name="ManageCaregiver" component={ManageCaregiverScreen} />
       <Stack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <Stack.Screen name="SoundSettings" component={SoundSettingsScreen} />
+      <Stack.Screen name="VibrationSettings" component={VibrationSettingsScreen} />
+      <Stack.Screen name="AvatarPreference" component={AvatarPreferenceScreen} />
     </Stack.Navigator>
   )
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
 

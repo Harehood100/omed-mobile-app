@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native'
+import * as LocalAuthentication from 'expo-local-authentication'
 import ScreenHeader from '../components/ScreenHeader'
 import FormInput from '../components/FormInput'
 import NameRow from '../components/NameRow'
-import SuccessModal from '../components/SucessModal'
+import SuccessModal from '../components/SuccessModal'
 
 let nextId = 1
 const makeId = () => String(nextId++)
@@ -11,7 +12,7 @@ const makeId = () => String(nextId++)
 export default function EditDetailsScreen({ navigation }) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
-    const [biometrics, setBiometrics] = useState([{ id: makeId(), name: '' }, { id: makeId(), name: '' }])
+    const [biometrics, setBiometrics] = useState([])
     const [showModal, setShowModal] = useState(false)
 
     const updateBiometric = (id, name) => {
@@ -22,8 +23,33 @@ export default function EditDetailsScreen({ navigation }) {
         setBiometrics((prev) => prev.filter((b) => b.id !== id))
     }
 
-    const addBiometric = () => {
-        setBiometrics((prev) => [...prev, { id: makeId(), name: '' }])
+    // Runs the device's real Face ID / fingerprint prompt before adding a row,
+    // so "enrollment" actually reflects a working biometric on this device.
+    const enrollBiometric = async (defaultLabel) => {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync()
+        if (!hasHardware) {
+            Alert.alert('Not supported', 'This device does not have biometric hardware.')
+            return
+        }
+
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync()
+        if (!isEnrolled) {
+            Alert.alert(
+                'No biometrics set up',
+                'Please set up Face ID / fingerprint in your device settings first, then try again.'
+            )
+            return
+        }
+
+        const result = await LocalAuthentication.authenticateAsync({
+            promptMessage: `Confirm ${defaultLabel}`,
+        })
+
+        if (result.success) {
+            setBiometrics((prev) => [...prev, { id: makeId(), name: defaultLabel }])
+        } else if (result.error !== 'user_cancel') {
+            Alert.alert('Authentication failed', 'Please try again.')
+        }
     }
 
     const handleSave = () => {
@@ -49,25 +75,28 @@ export default function EditDetailsScreen({ navigation }) {
                     <View style={styles.gap} />
 
                     <Text style={styles.label}>Thumbprint / Face Scan</Text>
-                    <View style={styles.rowsGap}>
-                        {biometrics.map((b) => (
-                            <NameRow
-                                key={b.id}
-                                value={b.name}
-                                onChangeText={(text) => updateBiometric(b.id, text)}
-                                onDelete={() => deleteBiometric(b.id)}
-                            />
-                        ))}
-                    </View>
-                    <View style={styles.gap} />
+                    {biometrics.length > 0 && (
+                        <>
+                            <View style={styles.rowsGap}>
+                                {biometrics.map((b) => (
+                                    <NameRow
+                                        key={b.id}
+                                        value={b.name}
+                                        onChangeText={(text) => updateBiometric(b.id, text)}
+                                        onDelete={() => deleteBiometric(b.id)}
+                                    />
+                                ))}
+                            </View>
+                            <View style={styles.gap} />
+                        </>
+                    )}
 
-                    {/* Placeholder actions — hook up to real biometric enrollment (e.g. expo-local-authentication) when ready. */}
-                    <TouchableOpacity style={styles.addBtn} onPress={addBiometric} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => enrollBiometric('Fingerprint')} activeOpacity={0.8}>
                         <View style={styles.addIconWrap}><Text style={styles.addIcon}>👆</Text></View>
                         <Text style={styles.addLabel}>Add Thumbprint</Text>
                     </TouchableOpacity>
                     <View style={styles.smallGap} />
-                    <TouchableOpacity style={styles.addBtn} onPress={addBiometric} activeOpacity={0.8}>
+                    <TouchableOpacity style={styles.addBtn} onPress={() => enrollBiometric('Face ID')} activeOpacity={0.8}>
                         <View style={styles.addIconWrap}><Text style={styles.addIcon}>🙂</Text></View>
                         <Text style={styles.addLabel}>Add Face Scan</Text>
                     </TouchableOpacity>
