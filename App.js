@@ -15,6 +15,7 @@ import AppointmentsScreen from './screens/AppointmentsScreen'
 import SetReminderScreen from './screens/SetReminderScreen'
 import ConfirmAppointmentScreen from './screens/ConfirmAppointmentScreen'
 import InputMedicationsScreen from './screens/InputMedicationsScreen'
+import MedicationsScreen from './screens/MedicationsScreen'
 import MedicationReminderScreen from './screens/MedicationReminderScreen'
 import ProfileScreen from './screens/ProfileScreen'
 import EditDetailsScreen from './screens/EditDetailsScreen'
@@ -45,6 +46,7 @@ function RootNavigator() {
       <Stack.Screen name="SetReminder" component={SetReminderScreen} />
       <Stack.Screen name="ConfirmAppointment" component={ConfirmAppointmentScreen} />
       <Stack.Screen name="InputMedications" component={InputMedicationsScreen} />
+      <Stack.Screen name="Medications" component={MedicationsScreen} />
       <Stack.Screen name="MedicationReminder" component={MedicationReminderScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="EditDetails" component={EditDetailsScreen} />

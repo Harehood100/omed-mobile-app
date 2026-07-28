@@ -1,26 +1,25 @@
-import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Platform } from 'react-native'
+import { useCallback, useEffect, useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Platform, ActivityIndicator, RefreshControl } from 'react-native'
 // npm install @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker'
-
-const initialAppointments = [
-    {
-        id: '1',
-        doctorName: 'Dr. John Adams',
-        specialty: 'General Practitioner',
-        dateLabel: 'Tuesday, July 30 . 10:00AM',
-        status: 'Approved',
-    },
-]
+import { getAppointments } from '../api/appointments'
 
 function initials(name) {
+    if (!name) return '?'
     return name
         .replace('Dr.', '')
         .trim()
         .split(' ')
+        .filter(Boolean)
         .map((p) => p[0])
         .join('')
         .toUpperCase()
+}
+
+function formatDateLabel(dateStr, timeStr) {
+    if (!dateStr) return timeStr || ''
+    const label = new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+    return timeStr ? `${label} . ${timeStr}` : label
 }
 
 function AppointmentCard({ appointment }) {
@@ -37,8 +36,9 @@ function AppointmentCard({ appointment }) {
                 </View>
                 <View style={{ flex: 1 }}>
                     <Text style={styles.doctorName}>{appointment.doctorName}</Text>
-                    <Text style={styles.specialty}>{appointment.specialty}</Text>
-                    <Text style={styles.dateLabel}>{appointment.dateLabel}</Text>
+                    <Text style={styles.specialty}>{appointment.doctorSpecialty}</Text>
+                    <Text style={styles.dateLabel}>{formatDateLabel(appointment.appointmentDate, appointment.appointmentTime)}</Text>
+                    {appointment.hospitalName ? <Text style={styles.hospital}>{appointment.hospitalName}</Text> : null}
                 </View>
             </View>
         </View>
@@ -46,18 +46,39 @@ function AppointmentCard({ appointment }) {
 }
 
 export default function AppointmentsScreen({ navigation, route }) {
-    const [appointments, setAppointments] = useState(initialAppointments)
+    const [appointments, setAppointments] = useState([])
+    const [isLoading, setIsLoading] = useState(true)
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const [loadError, setLoadError] = useState(null)
     const [pickerStep, setPickerStep] = useState(null) // null | 'date' | 'time'
     const [pickedDate, setPickedDate] = useState(new Date())
 
-    // Merge in a newly-saved appointment coming back from ConfirmAppointmentScreen
-    useEffect(() => {
-        const newAppointment = route?.params?.newAppointment
-        if (newAppointment) {
-            setAppointments((prev) => [newAppointment, ...prev])
-            navigation.setParams({ newAppointment: undefined })
+    const loadAppointments = useCallback(async ({ silent = false } = {}) => {
+        if (!silent) setIsLoading(true)
+        setLoadError(null)
+        try {
+            const data = await getAppointments()
+            setAppointments(Array.isArray(data) ? data : data?.appointments || [])
+        } catch (err) {
+            setLoadError(err.message || 'Could not load appointments.')
+        } finally {
+            setIsLoading(false)
+            setIsRefreshing(false)
         }
-    }, [route?.params?.newAppointment])
+    }, [])
+
+    useEffect(() => {
+        loadAppointments()
+    }, [loadAppointments])
+
+    // A newly-created appointment comes back from ConfirmAppointmentScreen — refetch
+    // to stay in sync with the server rather than trusting local state alone.
+    useEffect(() => {
+        if (route?.params?.appointmentCreated) {
+            navigation.setParams({ appointmentCreated: undefined })
+            loadAppointments({ silent: true })
+        }
+    }, [route?.params?.appointmentCreated, loadAppointments, navigation])
 
     const startCreateAppointment = () => {
         setPickedDate(new Date())
@@ -82,7 +103,12 @@ export default function AppointmentsScreen({ navigation, route }) {
 
     return (
         <SafeAreaView style={styles.screen}>
-            <ScrollView contentContainerStyle={styles.scroll}>
+            <ScrollView
+                contentContainerStyle={styles.scroll}
+                refreshControl={
+                    <RefreshControl refreshing={isRefreshing} onRefresh={() => { setIsRefreshing(true); loadAppointments({ silent: true }) }} />
+                }
+            >
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Text style={styles.backArrow}>←</Text>
@@ -97,8 +123,29 @@ export default function AppointmentsScreen({ navigation, route }) {
                     </TouchableOpacity>
                 </View>
 
-                {appointments.map((a) => (
-                    <AppointmentCard key={a.id} appointment={a} />
+                {isLoading && (
+                    <View style={styles.centerBox}>
+                        <ActivityIndicator color="#3D3F8F" />
+                    </View>
+                )}
+
+                {!isLoading && loadError && (
+                    <View style={styles.centerBox}>
+                        <Text style={styles.errorText}>{loadError}</Text>
+                        <TouchableOpacity onPress={() => loadAppointments()}>
+                            <Text style={styles.retryText}>Tap to retry</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                {!isLoading && !loadError && appointments.length === 0 && (
+                    <View style={styles.centerBox}>
+                        <Text style={styles.emptyText}>No appointments yet. Create one above.</Text>
+                    </View>
+                )}
+
+                {!isLoading && !loadError && appointments.map((a) => (
+                    <AppointmentCard key={a.id || a._id} appointment={a} />
                 ))}
             </ScrollView>
 
@@ -134,4 +181,9 @@ const styles = StyleSheet.create({
     doctorName: { color: '#FFFFFF', fontSize: 18, fontWeight: 'bold' },
     specialty: { color: '#D8DAEC', fontSize: 15, marginTop: 2 },
     dateLabel: { color: '#D8DAEC', fontSize: 14, marginTop: 8 },
+    hospital: { color: '#B7BAE0', fontSize: 13, marginTop: 4 },
+    centerBox: { alignItems: 'center', paddingVertical: 24, gap: 10 },
+    errorText: { color: '#B3261E', fontSize: 15, textAlign: 'center' },
+    retryText: { color: '#3D3F8F', fontSize: 15, fontWeight: '600' },
+    emptyText: { color: '#6B6E9E', fontSize: 15, textAlign: 'center' },
 })

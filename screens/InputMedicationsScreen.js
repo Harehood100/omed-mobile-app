@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Scro
 import SuccessModal from '../components/SuccessModal'
 import { createMedication } from '../api/medications'
 import { parseTimeString, toHHMM } from '../lib/medicationTime'
+import { extractErrorMessage } from '../lib/errorMessage'
 
 let nextId = 1
 const makeRow = () => ({ id: nextId++, text: '' })
@@ -71,8 +72,8 @@ export default function InputMedicationsScreen({ navigation }) {
         if (failures.length > 0) {
             const messages = failures.map(({ r, row }) => {
                 const err = r.reason
-                const detail = err?.errors ? Object.values(err.errors).flat().join(' ') : err?.message
-                return `"${row.text}": ${detail || 'Failed to save.'}`
+                console.log('createMedication failed:', JSON.stringify(err))
+                return `"${row.text}": ${extractErrorMessage(err)}`
             })
             Alert.alert(
                 failures.length === filled.length ? 'Save failed' : 'Some medications failed to save',

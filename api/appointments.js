@@ -1,8 +1,13 @@
 import client from './client'
 
+// NOTE: the written contract calls this field "doctorSpeciality", but the
+// live backend actually validates and expects "doctorSpecialty" (no second
+// "i") — confirmed via a real 400 response. We keep our internal JS naming
+// as doctorSpeciality for consistency with the rest of the app, and only
+// rename it right here at the wire boundary.
 export const createAppointment = async ({ hospitalName, doctorSpeciality, doctorName, appointmentDate, appointmentTime, note }) => {
     const { data } = await client.post('/appointments', {
-        hospitalName, doctorSpeciality, doctorName, appointmentDate, appointmentTime, note,
+        hospitalName, doctorSpecialty: doctorSpeciality, doctorName, appointmentDate, appointmentTime, note,
     })
     return data.data
 }
