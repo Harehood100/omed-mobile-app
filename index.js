@@ -1,5 +1,10 @@
 import { registerRootComponent } from 'expo';
 
+// Must be imported before anything else — TaskManager.defineTask needs to run at module
+// scope so the task is available even if the OS relaunches the app headlessly in the
+// background. See lib/reminderBackgroundTask.js.
+import './lib/reminderBackgroundTask';
+
 import App from './App';
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

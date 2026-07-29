@@ -4,7 +4,8 @@ import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { AuthProvider } from './context/AuthContext'
 import ErrorBoundary from './components/ErrorBoundary'
-import { registerReminderTriggerListener } from './lib/localNotifications'
+import { registerReminderTriggerListener, registerReminderResponseListener } from './lib/localNotifications'
+import { registerReminderSyncTask } from './lib/reminderBackgroundTask'
 import { triggerReminder } from './api/reminders'
 import SplashScreen from './screens/SplashScreen'
 import WelcomeScreen from './screens/WelcomeScreen'
@@ -64,15 +65,33 @@ function RootNavigator() {
 }
 
 export default function App() {
-  // Whenever a scheduled local notification actually displays, tell the backend so it
-  // can flip the reminder from PENDING to TRIGGERED (see lib/localNotifications.js).
+  // Three layers reporting reminder triggers back to the backend, from most to least
+  // immediate — see lib/localNotifications.js and lib/reminderBackgroundTask.js for why
+  // each one exists:
+  //  1. Notification displayed while the app is alive (foreground/backgrounded)
+  //  2. User taps the notification to open the app (works even from fully killed)
+  //  3. Periodic background reconciliation, for reminders fired while killed and never tapped
   useEffect(() => {
-    const subscription = registerReminderTriggerListener((reminderId) => {
+    const receivedSub = registerReminderTriggerListener((reminderId) => {
       triggerReminder(reminderId).catch((err) => {
         console.log('triggerReminder failed:', JSON.stringify(err))
       })
     })
-    return () => subscription.remove()
+
+    const responseSub = registerReminderResponseListener((reminderId) => {
+      triggerReminder(reminderId).catch((err) => {
+        console.log('triggerReminder (from notification tap) failed:', JSON.stringify(err))
+      })
+    })
+
+    registerReminderSyncTask().catch((err) => {
+      console.log('registerReminderSyncTask failed:', JSON.stringify(err))
+    })
+
+    return () => {
+      receivedSub.remove()
+      responseSub.remove()
+    }
   }, [])
 
   return (

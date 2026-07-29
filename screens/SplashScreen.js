@@ -1,20 +1,27 @@
-import { useEffect, useRef } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { useEffect, useRef, useState } from 'react'
+import { StyleSheet, View, Text } from 'react-native'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { useAuth } from '../context/AuthContext'
 
 const videoSource = require('../assets/splash-animation.mp4')
 
-// 37 frames at 15fps ≈ 2.47s. Used as a fallback in case the `playToEnd`
-// event doesn't fire reliably (a known expo-video issue on some devices).
-const FALLBACK_DURATION_MS = 2700
+// One loop of the animation, in ms (37 frames at 15fps) — the minimum time the brand
+// plays before we're willing to navigate away, even if the session check finishes sooner.
+const MIN_PLAY_MS = 2700
+// If we're still waiting past this, something's slow (bad network, etc.) — show a subtle
+// hint so a looping video doesn't read as stuck. The video keeps looping either way; see
+// below for why we loop instead of freezing on the last frame.
+const SLOW_HINT_MS = 4500
+// Absolute ceiling so a session check that never resolves can never strand the user here.
+const ABSOLUTE_MAX_MS = 12000
 
 export default function SplashScreen({ navigation }) {
     const { user, isLoading, lastKnownUser } = useAuth()
     const hasNavigated = useRef(false)
+    const [showSlowHint, setShowSlowHint] = useState(false)
 
-    // Refs always hold the latest auth values so the video-end listener
-    // (registered once on mount) never reads a stale closure.
+    // Refs always hold the latest auth values so the timers below (registered once on
+    // mount) never read a stale closure.
     const userRef = useRef(user)
     const isLoadingRef = useRef(isLoading)
     const lastKnownUserRef = useRef(lastKnownUser)
@@ -24,20 +31,20 @@ export default function SplashScreen({ navigation }) {
         lastKnownUserRef.current = lastKnownUser
     }, [user, isLoading, lastKnownUser])
 
+    // Looping instead of stopping dead on a single frame — this clip happens to end on a
+    // solid purple frame, which reads as a blank/broken page if the auth check takes any
+    // extra time to resolve after the animation finishes.
     const player = useVideoPlayer(videoSource, (p) => {
-        p.loop = false
+        p.loop = true
         p.play()
     })
 
     useEffect(() => {
+        let cancelled = false
+        const startedAt = Date.now()
+
         const goNext = () => {
-            if (hasNavigated.current) return
-            if (isLoadingRef.current) {
-                // Session check still running — try again shortly rather than
-                // guessing where to route.
-                setTimeout(goNext, 150)
-                return
-            }
+            if (hasNavigated.current || cancelled) return
             hasNavigated.current = true
             if (userRef.current) {
                 navigation.replace('Home')
@@ -48,17 +55,26 @@ export default function SplashScreen({ navigation }) {
             }
         }
 
-        const subscription = player.addListener('playToEnd', goNext)
-        // Safety net: don't leave the user stuck on the splash forever if the
-        // playToEnd event never fires.
-        const fallback = setTimeout(goNext, FALLBACK_DURATION_MS)
+        const tryNavigate = () => {
+            if (cancelled) return
+            const elapsed = Date.now() - startedAt
+            if (isLoadingRef.current && elapsed < ABSOLUTE_MAX_MS) {
+                setTimeout(tryNavigate, 150)
+                return
+            }
+            goNext()
+        }
+
+        const minPlayTimer = setTimeout(tryNavigate, MIN_PLAY_MS)
+        const slowHintTimer = setTimeout(() => setShowSlowHint(true), SLOW_HINT_MS)
 
         return () => {
-            subscription.remove()
-            clearTimeout(fallback)
+            cancelled = true
+            clearTimeout(minPlayTimer)
+            clearTimeout(slowHintTimer)
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [player])
+    }, [])
 
     return (
         <View style={styles.container}>
@@ -68,6 +84,11 @@ export default function SplashScreen({ navigation }) {
                 contentFit="cover"
                 nativeControls={false}
             />
+            {showSlowHint && (
+                <View style={styles.hintWrap}>
+                    <Text style={styles.hintText}>Still loading…</Text>
+                </View>
+            )}
         </View>
     )
 }
@@ -75,4 +96,6 @@ export default function SplashScreen({ navigation }) {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#FFFFFF' },
     video: { flex: 1, width: '100%', height: '100%' },
+    hintWrap: { position: 'absolute', bottom: 48, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16 },
+    hintText: { color: '#FFFFFF', fontSize: 13, fontWeight: '600' },
 })
